@@ -1,0 +1,2299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code Stats</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            /* Dark Opal palette */
+            --bg-base: #09090b;
+            --bg-secondary: #0c0c0e;
+            --bg-card: #121214;
+            --bg-elevated: #1a1a1e;
+            --bg-hover: #1e1e24;
+
+            /* Borders */
+            --border-subtle: rgba(255, 255, 255, 0.05);
+            --border-medium: rgba(255, 255, 255, 0.1);
+
+            /* Text */
+            --text-primary: #f4f4f6;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+
+            /* Accent - Warm Amber */
+            --accent: #F59E0B;
+            --accent-dim: rgba(245, 158, 11, 0.15);
+            --accent-glow: rgba(245, 158, 11, 0.3);
+
+            /* Semantic */
+            --success: #10b981;
+            --info: #3b82f6;
+
+            /* Heatmap colors */
+            --heat-0: #1a1a1e;
+            --heat-1: #2d2a1a;
+            --heat-2: #4a3d1a;
+            --heat-3: #6b4f1a;
+            --heat-4: #8b611a;
+            --heat-5: #F59E0B;
+
+            /* Fonts */
+            --font-display: 'Outfit', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-display);
+            background: var(--bg-base);
+            color: var(--text-primary);
+            font-size: 15px;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* Subtle grid background */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 32px 24px 80px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .header-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+        }
+
+        .header-subtitle {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .header-filters {
+            display: flex;
+            gap: 12px;
+        }
+
+        .filter-select {
+            background: var(--bg-card);
+            border: 1px solid var(--border-medium);
+            border-radius: 8px;
+            padding: 8px 32px 8px 12px;
+            color: var(--text-primary);
+            font-family: var(--font-display);
+            font-size: 13px;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            transition: border-color 0.15s ease;
+        }
+
+        .filter-select:hover {
+            border-color: var(--accent);
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-dim);
+        }
+
+        /* Big Numbers */
+        .big-numbers {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 20px;
+            transition: border-color 0.2s ease, transform 0.2s ease;
+        }
+
+        .stat-card:hover {
+            border-color: var(--border-medium);
+            transform: translateY(-2px);
+        }
+
+        .stat-value {
+            font-family: var(--font-mono);
+            font-size: 32px;
+            font-weight: 600;
+            color: var(--text-primary);
+            line-height: 1.2;
+        }
+
+        .stat-value.accent {
+            color: var(--accent);
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Section Cards */
+        .section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 20px;
+        }
+
+        /* Grid layouts */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        @media (max-width: 1024px) {
+            .grid-3 { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 768px) {
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+        }
+
+        /* Heatmap */
+        .heatmap-container {
+            overflow-x: auto;
+            padding-bottom: 8px;
+        }
+
+        .heatmap {
+            display: flex;
+            gap: 3px;
+        }
+
+        .heatmap-week {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .heatmap-cell {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            background: var(--heat-0);
+            transition: transform 0.1s ease;
+            cursor: pointer;
+        }
+
+        .heatmap-cell:hover {
+            transform: scale(1.3);
+            outline: 2px solid var(--accent);
+            outline-offset: 1px;
+        }
+
+        .heatmap-cell.level-1 { background: var(--heat-1); }
+        .heatmap-cell.level-2 { background: var(--heat-2); }
+        .heatmap-cell.level-3 { background: var(--heat-3); }
+        .heatmap-cell.level-4 { background: var(--heat-4); }
+        .heatmap-cell.level-5 { background: var(--heat-5); }
+
+        .heatmap-labels {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            margin-right: 8px;
+            font-size: 10px;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .heatmap-label {
+            height: 14px;
+            display: flex;
+            align-items: center;
+        }
+
+        .heatmap-wrapper {
+            display: flex;
+        }
+
+        .heatmap-outer {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .heatmap-months {
+            display: flex;
+            gap: 3px;
+            font-size: 10px;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            margin-bottom: 4px;
+            height: 14px;
+        }
+
+        .heatmap-month {
+            display: flex;
+            align-items: center;
+        }
+
+        .heatmap-legend {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .heatmap-legend-cells {
+            display: flex;
+            gap: 2px;
+        }
+
+        .heatmap-legend-cell {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        /* Charts */
+        .chart-container {
+            position: relative;
+            height: 200px;
+        }
+
+        /* Bar list */
+        .bar-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .bar-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .bar-label {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: var(--text-secondary);
+            width: 100px;
+            flex-shrink: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .bar-track {
+            flex: 1;
+            height: 8px;
+            background: var(--bg-elevated);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #fbbf24);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .bar-value {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--text-muted);
+            width: 60px;
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        /* Donut chart container */
+        .donut-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+        }
+
+        .donut-chart {
+            width: 140px;
+            height: 140px;
+        }
+
+        .donut-legend {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .donut-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+
+        .donut-legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .donut-legend-label {
+            color: var(--text-secondary);
+        }
+
+        .donut-legend-value {
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+
+        /* Fun facts */
+        .fun-facts {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+
+        @media (max-width: 1200px) {
+            .fun-facts { grid-template-columns: repeat(3, 1fr); }
+        }
+
+        @media (max-width: 900px) {
+            .fun-facts { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 600px) {
+            .fun-facts { grid-template-columns: 1fr; }
+        }
+
+        .fun-fact {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: var(--bg-elevated);
+            border-radius: 8px;
+            font-size: 13px;
+            transition: background-color 0.15s ease;
+        }
+
+        .fun-fact:hover {
+            background: var(--bg-hover);
+        }
+
+        .fun-fact-emoji {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .fun-fact-text {
+            color: var(--text-secondary);
+            line-height: 1.3;
+        }
+
+        /* Mini stats grid */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .mini-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px;
+            background: var(--bg-elevated);
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .mini-stat-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .mini-stat-value {
+            font-family: var(--font-mono);
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .mini-stat-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 4px;
+        }
+
+        /* Session types */
+        .session-types {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .session-type {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .session-type-bar {
+            width: 8px;
+            height: 32px;
+            border-radius: 4px;
+        }
+
+        .session-type-bar.quick { background: #10b981; }
+        .session-type-bar.medium { background: #F59E0B; }
+        .session-type-bar.long { background: #8b5cf6; }
+
+        .session-type-label {
+            flex: 1;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .session-type-value {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Weekday chart */
+        .weekday-chart {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            height: 120px;
+            padding: 8px 0;
+        }
+
+        .weekday-bar {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            gap: 8px;
+        }
+
+        .weekday-bar-fill {
+            width: 24px;
+            background: linear-gradient(180deg, var(--accent), #fbbf24);
+            border-radius: 4px 4px 0 0;
+            min-height: 4px;
+        }
+
+        .weekday-bar-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .weekday-bar-value {
+            font-size: 10px;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+        }
+
+        /* Git projects table */
+        .git-projects-table {
+            display: grid;
+            grid-template-columns: 2fr repeat(5, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .git-projects-header, .git-projects-cell {
+            padding: 10px 12px;
+            background: var(--bg-elevated);
+            font-size: 13px;
+        }
+
+        .git-projects-header {
+            font-weight: 600;
+            color: var(--text-primary);
+            background: var(--bg-hover);
+        }
+
+        .git-projects-cell {
+            color: var(--text-secondary);
+        }
+
+        .git-projects-cell.project-name {
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 12px;
+        }
+
+        .git-projects-cell.number {
+            text-align: right;
+            font-family: var(--font-mono);
+        }
+
+        .git-projects-cell.highlight {
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        /* Skills/Agents list */
+        .list-section {
+            margin-bottom: 20px;
+        }
+
+        .list-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .list-header {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+        }
+
+        .list-items {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: var(--bg-elevated);
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        .list-item-name {
+            font-family: var(--font-mono);
+            color: var(--text-secondary);
+        }
+
+        .list-item-value {
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: fixed;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-medium);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-family: var(--font-mono);
+            color: var(--text-primary);
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-in {
+            animation: fadeInUp 0.4s ease forwards;
+            opacity: 0;
+        }
+
+        .delay-1 { animation-delay: 0.05s; }
+        .delay-2 { animation-delay: 0.1s; }
+        .delay-3 { animation-delay: 0.15s; }
+        .delay-4 { animation-delay: 0.2s; }
+        .delay-5 { animation-delay: 0.25s; }
+        .delay-6 { animation-delay: 0.3s; }
+        .delay-7 { animation-delay: 0.35s; }
+        .delay-8 { animation-delay: 0.4s; }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 32px;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header animate-in">
+            <div>
+                <h1 class="header-title">Your Claude Code Stats</h1>
+                <div class="header-subtitle" id="date-range">Loading...</div>
+            </div>
+            <div class="header-filters">
+                <select class="filter-select" id="timeframe-filter">
+                    <option value="all">All Time</option>
+                    <option value="7">Last 7 Days</option>
+                    <option value="30">Last 30 Days</option>
+                    <option value="90">Last 90 Days</option>
+                </select>
+                <select class="filter-select" id="project-filter">
+                    <option value="all">All Projects</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Big Numbers -->
+        <div class="big-numbers">
+            <div class="stat-card animate-in delay-1">
+                <div class="stat-value" id="total-sessions">-</div>
+                <div class="stat-label">Sessions</div>
+            </div>
+            <div class="stat-card animate-in delay-2">
+                <div class="stat-value" id="total-messages">-</div>
+                <div class="stat-label">Messages</div>
+            </div>
+            <div class="stat-card animate-in delay-3">
+                <div class="stat-value" id="total-tokens">-</div>
+                <div class="stat-label" id="tokens-label">Billed Tokens</div>
+            </div>
+            <div class="stat-card animate-in delay-4">
+                <div class="stat-value accent" id="total-cost">-</div>
+                <div class="stat-label">Est. Cost</div>
+            </div>
+            <div class="stat-card animate-in delay-5">
+                <div class="stat-value" id="total-tools">-</div>
+                <div class="stat-label">Tool Calls</div>
+            </div>
+        </div>
+
+        <!-- Fun Facts (below big numbers) -->
+        <div class="section animate-in delay-5">
+            <div class="section-title">Fun Facts</div>
+            <div class="fun-facts" id="fun-facts"></div>
+        </div>
+
+        <!-- Working Style & Productivity Row -->
+        <div class="grid-2">
+            <div class="section animate-in delay-5">
+                <div class="section-title">Working Style</div>
+                <div class="stat-grid" id="working-style-stats">
+                    <div class="mini-stat">
+                        <span class="mini-stat-icon">🌙</span>
+                        <span class="mini-stat-value" id="night-owl-pct">-</span>
+                        <span class="mini-stat-label">Night Owl</span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-stat-icon">🏖️</span>
+                        <span class="mini-stat-value" id="weekend-pct">-</span>
+                        <span class="mini-stat-label">Weekend</span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-stat-icon">🔥</span>
+                        <span class="mini-stat-value" id="streak-days">-</span>
+                        <span class="mini-stat-label">Best Streak</span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-stat-icon">🔄</span>
+                        <span class="mini-stat-value" id="avg-turns">-</span>
+                        <span class="mini-stat-label">Avg Turns</span>
+                    </div>
+                </div>
+            </div>
+            <div class="section animate-in delay-5">
+                <div class="section-title">Session Types</div>
+                <div class="session-types" id="session-types">
+                    <div class="session-type">
+                        <div class="session-type-bar quick"></div>
+                        <span class="session-type-label">Quick (&lt;5m)</span>
+                        <span class="session-type-value" id="quick-sessions">-</span>
+                    </div>
+                    <div class="session-type">
+                        <div class="session-type-bar medium"></div>
+                        <span class="session-type-label">Medium (5-30m)</span>
+                        <span class="session-type-value" id="medium-sessions">-</span>
+                    </div>
+                    <div class="session-type">
+                        <div class="session-type-bar long"></div>
+                        <span class="session-type-label">Deep (&gt;30m)</span>
+                        <span class="session-type-value" id="long-sessions">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Daily Averages & Context Row -->
+        <div class="grid-2">
+            <div class="section animate-in delay-5">
+                <div class="section-title">Daily Averages</div>
+                <div class="stat-grid" id="daily-averages-stats">
+                    <div class="mini-stat">
+                        <span class="mini-stat-icon">📅</span>
+                        <span class="mini-stat-value" id="active-days">-</span>
+                        <span class="mini-stat-label">Active Days</span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-stat-icon">💬</span>
+                        <span class="mini-stat-value" id="avg-sessions-day">-</span>
+                        <span class="mini-stat-label">Sessions/Day</span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-stat-icon">🎫</span>
+                        <span class="mini-stat-value" id="avg-tokens-day">-</span>
+                        <span class="mini-stat-label">Tokens/Day</span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-stat-icon">💰</span>
+                        <span class="mini-stat-value" id="avg-cost-day">-</span>
+                        <span class="mini-stat-label">Cost/Day</span>
+                    </div>
+                </div>
+            </div>
+            <div class="section animate-in delay-5">
+                <div class="section-title">Context Window Usage</div>
+                <div class="stat-grid" id="context-usage-stats">
+                    <div class="mini-stat">
+                        <span class="mini-stat-icon">📊</span>
+                        <span class="mini-stat-value" id="avg-context">-</span>
+                        <span class="mini-stat-label">Avg Max Context</span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-stat-icon">📈</span>
+                        <span class="mini-stat-value" id="median-context">-</span>
+                        <span class="mini-stat-label">Median Context</span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-stat-icon">🔝</span>
+                        <span class="mini-stat-value" id="p90-context">-</span>
+                        <span class="mini-stat-label">P90 Context</span>
+                    </div>
+                    <div class="mini-stat">
+                        <span class="mini-stat-icon">⚠️</span>
+                        <span class="mini-stat-value" id="tool-failures">-</span>
+                        <span class="mini-stat-label">Tool Failures</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Workflows Section -->
+        <div class="section animate-in delay-6">
+            <div class="section-title">Workflows</div>
+            <div class="grid-3" style="gap: 24px;">
+                <div class="list-section">
+                    <div class="list-header">Discipline</div>
+                    <div class="stat-grid" id="discipline-stats">
+                        <div class="mini-stat">
+                            <span class="mini-stat-icon">📋</span>
+                            <span class="mini-stat-value" id="todo-writes">-</span>
+                            <span class="mini-stat-label">TodoWrite</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="mini-stat-icon">🎯</span>
+                            <span class="mini-stat-value" id="plan-mode">-</span>
+                            <span class="mini-stat-label">Plan Mode</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="mini-stat-icon">⚡</span>
+                            <span class="mini-stat-value" id="skill-invocations">-</span>
+                            <span class="mini-stat-label">Skills</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="mini-stat-icon">🤖</span>
+                            <span class="mini-stat-value" id="subagent-spawns">-</span>
+                            <span class="mini-stat-label">Subagents</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="list-section">
+                    <div class="list-header">Research</div>
+                    <div class="stat-grid" id="research-stats">
+                        <div class="mini-stat">
+                            <span class="mini-stat-icon">🔍</span>
+                            <span class="mini-stat-value" id="web-searches">-</span>
+                            <span class="mini-stat-label">Web Search</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="mini-stat-icon">📥</span>
+                            <span class="mini-stat-value" id="web-fetches">-</span>
+                            <span class="mini-stat-label">Web Fetch</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="mini-stat-icon">❓</span>
+                            <span class="mini-stat-value" id="user-questions">-</span>
+                            <span class="mini-stat-label">Ask User</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="mini-stat-icon">📖</span>
+                            <span class="mini-stat-value" id="read-ratio">-</span>
+                            <span class="mini-stat-label">Read:Edit</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="list-section">
+                    <div class="list-header">Configuration</div>
+                    <div class="stat-grid" id="config-stats">
+                        <div class="mini-stat">
+                            <span class="mini-stat-icon">📁</span>
+                            <span class="mini-stat-value" id="project-claude-md">-</span>
+                            <span class="mini-stat-label">Project CLAUDE.md</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="mini-stat-icon">🌍</span>
+                            <span class="mini-stat-value" id="global-claude-md">-</span>
+                            <span class="mini-stat-label">Global CLAUDE.md</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="mini-stat-icon">⚙️</span>
+                            <span class="mini-stat-value" id="settings-edits">-</span>
+                            <span class="mini-stat-label">Settings</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="mini-stat-icon">🔄</span>
+                            <span class="mini-stat-value" id="compactions">-</span>
+                            <span class="mini-stat-label">Compactions</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tool Sequences & Cost by Day -->
+        <div class="grid-2">
+            <div class="section animate-in delay-6">
+                <div class="section-title">Tool Patterns</div>
+                <div class="bar-list" id="tool-sequences-list"></div>
+            </div>
+            <div class="section animate-in delay-6">
+                <div class="section-title">Cost by Day of Week</div>
+                <div class="weekday-chart" id="weekday-chart"></div>
+            </div>
+        </div>
+
+        <!-- Error Analysis -->
+        <div class="section animate-in delay-6">
+            <div class="section-title">Error Analysis</div>
+            <div class="grid-3" style="gap: 24px;">
+                <div class="list-section">
+                    <div class="list-header">Summary</div>
+                    <div class="stat-grid" id="error-summary">
+                        <div class="mini-stat">
+                            <span class="mini-stat-icon">📊</span>
+                            <span class="mini-stat-value" id="total-tool-calls">-</span>
+                            <span class="mini-stat-label">Tool Calls</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="mini-stat-icon">❌</span>
+                            <span class="mini-stat-value" id="real-errors">-</span>
+                            <span class="mini-stat-label">Real Errors</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="mini-stat-icon">📉</span>
+                            <span class="mini-stat-value" id="error-rate">-</span>
+                            <span class="mini-stat-label">Error Rate</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="mini-stat-icon">🔄</span>
+                            <span class="mini-stat-value" id="warmup-errors">-</span>
+                            <span class="mini-stat-label">Warmup (excl)</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="list-section">
+                    <div class="list-header">Top Error Types</div>
+                    <div class="bar-list" id="error-categories-list"></div>
+                </div>
+                <div class="list-section">
+                    <div class="list-header">Error Rate by Tool</div>
+                    <div class="bar-list" id="error-rate-by-tool-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Commands Row (interesting - moved up) -->
+        <div class="grid-3" id="commands-row" style="display: none;">
+            <div class="section animate-in delay-6" id="git-section">
+                <div class="section-title">Git Commands</div>
+                <div class="bar-list" id="git-list"></div>
+            </div>
+            <div class="section animate-in delay-6" id="bash-section">
+                <div class="section-title">Shell Commands</div>
+                <div class="bar-list" id="bash-list"></div>
+            </div>
+            <div class="section animate-in delay-6" id="mcp-section">
+                <div class="section-title">MCP Servers</div>
+                <div class="bar-list" id="mcp-list"></div>
+            </div>
+        </div>
+
+        <!-- Git Activity by Project (interesting - moved up) -->
+        <div class="section animate-in delay-6" id="git-projects-section" style="display: none;">
+            <div class="section-title">Git Activity by Project</div>
+            <div class="git-projects-table" id="git-projects-table"></div>
+        </div>
+
+        <!-- Skills & Agents Row -->
+        <div class="section animate-in delay-7">
+            <div class="section-title">Skills & Agents</div>
+            <div class="grid-2" style="gap: 24px;">
+                <div class="list-section">
+                    <div class="list-header">Skills</div>
+                    <div class="list-items" id="skills-list"></div>
+                </div>
+                <div class="list-section">
+                    <div class="list-header">Subagent Types</div>
+                    <div class="list-items" id="agents-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Commands, Exotic & Errors Row (interesting - moved up) -->
+        <div class="grid-3" id="user-errors-row" style="display: none;">
+            <div class="section animate-in delay-7" id="user-commands-section">
+                <div class="section-title">Slash Commands</div>
+                <div class="bar-list" id="user-commands-list"></div>
+            </div>
+            <div class="section animate-in delay-7" id="exotic-section">
+                <div class="section-title">Exotic Commands</div>
+                <div class="bar-list" id="exotic-list"></div>
+            </div>
+            <div class="section animate-in delay-7" id="errors-section">
+                <div class="section-title">Tool Errors</div>
+                <div class="bar-list" id="errors-list"></div>
+            </div>
+        </div>
+
+        <!-- Breakdowns Row (standard - moved down) -->
+        <div class="grid-3">
+            <div class="section animate-in delay-8">
+                <div class="section-title">Top Tools</div>
+                <div class="bar-list" id="tools-list"></div>
+            </div>
+            <div class="section animate-in delay-8">
+                <div class="section-title">Models</div>
+                <div class="donut-container">
+                    <div class="donut-chart">
+                        <canvas id="models-chart"></canvas>
+                    </div>
+                    <div class="donut-legend" id="models-legend"></div>
+                </div>
+            </div>
+            <div class="section animate-in delay-8">
+                <div class="section-title">Projects by Cost</div>
+                <div class="bar-list" id="projects-list"></div>
+            </div>
+        </div>
+
+        <!-- Activity Row (standard - moved down) -->
+        <div class="grid-2">
+            <div class="section animate-in delay-9">
+                <div class="section-title">Activity</div>
+                <div class="heatmap-wrapper">
+                    <div class="heatmap-labels">
+                        <div class="heatmap-label" style="height: 18px;"></div>
+                        <div class="heatmap-label">Mon</div>
+                        <div class="heatmap-label">Tue</div>
+                        <div class="heatmap-label">Wed</div>
+                        <div class="heatmap-label">Thu</div>
+                        <div class="heatmap-label">Fri</div>
+                        <div class="heatmap-label">Sat</div>
+                        <div class="heatmap-label">Sun</div>
+                    </div>
+                    <div class="heatmap-outer">
+                        <div class="heatmap-months" id="heatmap-months"></div>
+                        <div class="heatmap-container">
+                            <div class="heatmap" id="heatmap"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="heatmap-legend">
+                    <span>Less</span>
+                    <div class="heatmap-legend-cells">
+                        <div class="heatmap-legend-cell" style="background: var(--heat-0)"></div>
+                        <div class="heatmap-legend-cell" style="background: var(--heat-1)"></div>
+                        <div class="heatmap-legend-cell" style="background: var(--heat-2)"></div>
+                        <div class="heatmap-legend-cell" style="background: var(--heat-3)"></div>
+                        <div class="heatmap-legend-cell" style="background: var(--heat-4)"></div>
+                        <div class="heatmap-legend-cell" style="background: var(--heat-5)"></div>
+                    </div>
+                    <span>More</span>
+                </div>
+            </div>
+            <div class="section animate-in delay-9">
+                <div class="section-title">Activity by Hour</div>
+                <div class="chart-container">
+                    <canvas id="hourly-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tokens Chart Row (standard - moved down) -->
+        <div class="section animate-in delay-9">
+            <div class="section-title">Tokens Over Time</div>
+            <div class="chart-container">
+                <canvas id="tokens-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Generated by <a href="https://github.com/anthropics/claude-code">Claude Code</a> meta plugin
+    </div>
+
+    <!-- Tooltip -->
+    <div class="tooltip" id="tooltip"></div>
+
+    <!-- Embedded Data -->
+    <script>
+        const STATS_DATA = {"filters": {"date_from": null, "date_to": null, "project": null}, "meta": {"earliest": "2025-12-22T10:54:35.243Z", "latest": "2026-01-28T08:51:25.644Z", "total_sessions": 41, "total_user_messages": 4594, "total_assistant_messages": 9692, "total_input_tokens": 546119, "total_output_tokens": 516503, "total_cache_read": 817523197, "total_cache_write": 61726220}, "activity_by_day": [{"date": "2025-12-22", "sessions": 1, "user_messages": 110, "assistant_messages": 221, "input_tokens": 15866, "output_tokens": 32384, "cache_read": 15908191, "cache_write": 1538559}, {"date": "2026-01-05", "sessions": 1, "user_messages": 11, "assistant_messages": 25, "input_tokens": 514, "output_tokens": 4088, "cache_read": 3079508, "cache_write": 428482}, {"date": "2026-01-06", "sessions": 2, "user_messages": 45, "assistant_messages": 91, "input_tokens": 9381, "output_tokens": 10967, "cache_read": 5600243, "cache_write": 954567}, {"date": "2026-01-07", "sessions": 2, "user_messages": 113, "assistant_messages": 259, "input_tokens": 7572, "output_tokens": 35382, "cache_read": 18940476, "cache_write": 1534300}, {"date": "2026-01-09", "sessions": 1, "user_messages": 29, "assistant_messages": 50, "input_tokens": 1031, "output_tokens": 4656, "cache_read": 1098457, "cache_write": 309500}, {"date": "2026-01-11", "sessions": 1, "user_messages": 146, "assistant_messages": 239, "input_tokens": 102328, "output_tokens": 49271, "cache_read": 12797017, "cache_write": 1608988}, {"date": "2026-01-12", "sessions": 1, "user_messages": 8, "assistant_messages": 16, "input_tokens": 328, "output_tokens": 1935, "cache_read": 2121284, "cache_write": 308094}, {"date": "2026-01-13", "sessions": 1, "user_messages": 7, "assistant_messages": 10, "input_tokens": 98, "output_tokens": 1393, "cache_read": 346478, "cache_write": 954046}, {"date": "2026-01-14", "sessions": 1, "user_messages": 182, "assistant_messages": 361, "input_tokens": 7120, "output_tokens": 50344, "cache_read": 28060950, "cache_write": 2661549}, {"date": "2026-01-15", "sessions": 2, "user_messages": 351, "assistant_messages": 785, "input_tokens": 19756, "output_tokens": 97827, "cache_read": 71395237, "cache_write": 3693119}, {"date": "2026-01-16", "sessions": 1, "user_messages": 53, "assistant_messages": 130, "input_tokens": 2668, "output_tokens": 21226, "cache_read": 13844878, "cache_write": 1623990}, {"date": "2026-01-17", "sessions": 2, "user_messages": 363, "assistant_messages": 826, "input_tokens": 17716, "output_tokens": 101567, "cache_read": 69748938, "cache_write": 5671059}, {"date": "2026-01-18", "sessions": 4, "user_messages": 362, "assistant_messages": 796, "input_tokens": 15604, "output_tokens": 90876, "cache_read": 64549171, "cache_write": 5906731}, {"date": "2026-01-21", "sessions": 2, "user_messages": 481, "assistant_messages": 1033, "input_tokens": 22299, "output_tokens": 2775, "cache_read": 90435466, "cache_write": 5853674}, {"date": "2026-01-22", "sessions": 2, "user_messages": 135, "assistant_messages": 300, "input_tokens": 15876, "output_tokens": 532, "cache_read": 26126306, "cache_write": 3674912}, {"date": "2026-01-23", "sessions": 5, "user_messages": 743, "assistant_messages": 1591, "input_tokens": 83810, "output_tokens": 3636, "cache_read": 143245391, "cache_write": 6769178}, {"date": "2026-01-25", "sessions": 2, "user_messages": 856, "assistant_messages": 1877, "input_tokens": 136179, "output_tokens": 4621, "cache_read": 183093188, "cache_write": 10463851}, {"date": "2026-01-26", "sessions": 4, "user_messages": 314, "assistant_messages": 617, "input_tokens": 29969, "output_tokens": 1525, "cache_read": 44717698, "cache_write": 3734377}, {"date": "2026-01-27", "sessions": 13, "user_messages": 209, "assistant_messages": 372, "input_tokens": 56438, "output_tokens": 1031, "cache_read": 18747095, "cache_write": 3552085}, {"date": "2026-01-28", "sessions": 8, "user_messages": 76, "assistant_messages": 93, "input_tokens": 1566, "output_tokens": 467, "cache_read": 3667225, "cache_write": 485159}], "activity_by_hour": [{"hour": 6, "messages": 6, "user_messages": 2, "assistant_messages": 4}, {"hour": 7, "messages": 179, "user_messages": 59, "assistant_messages": 120}, {"hour": 8, "messages": 369, "user_messages": 134, "assistant_messages": 235}, {"hour": 9, "messages": 289, "user_messages": 100, "assistant_messages": 189}, {"hour": 10, "messages": 340, "user_messages": 113, "assistant_messages": 227}, {"hour": 11, "messages": 335, "user_messages": 110, "assistant_messages": 225}, {"hour": 12, "messages": 674, "user_messages": 221, "assistant_messages": 453}, {"hour": 13, "messages": 308, "user_messages": 95, "assistant_messages": 213}, {"hour": 14, "messages": 193, "user_messages": 63, "assistant_messages": 130}, {"hour": 15, "messages": 818, "user_messages": 261, "assistant_messages": 557}, {"hour": 16, "messages": 1370, "user_messages": 436, "assistant_messages": 934}, {"hour": 17, "messages": 2191, "user_messages": 686, "assistant_messages": 1505}, {"hour": 18, "messages": 2536, "user_messages": 787, "assistant_messages": 1749}, {"hour": 19, "messages": 1072, "user_messages": 336, "assistant_messages": 736}, {"hour": 20, "messages": 762, "user_messages": 246, "assistant_messages": 516}, {"hour": 21, "messages": 2235, "user_messages": 745, "assistant_messages": 1490}, {"hour": 22, "messages": 359, "user_messages": 112, "assistant_messages": 247}, {"hour": 23, "messages": 250, "user_messages": 88, "assistant_messages": 162}], "activity_by_weekday": [{"dow": 0, "day_name": "Sun", "messages": 4276}, {"dow": 1, "day_name": "Mon", "messages": 1322}, {"dow": 2, "day_name": "Tue", "messages": 734}, {"dow": 3, "day_name": "Wed", "messages": 2598}, {"dow": 4, "day_name": "Thu", "messages": 1571}, {"dow": 5, "day_name": "Fri", "messages": 2596}, {"dow": 6, "day_name": "Sat", "messages": 1189}], "heatmap": [{"date": "2025-12-22", "hour": 10, "count": 115}, {"date": "2025-12-22", "hour": 11, "count": 100}, {"date": "2025-12-22", "hour": 12, "count": 3}, {"date": "2025-12-22", "hour": 14, "count": 41}, {"date": "2025-12-22", "hour": 18, "count": 72}, {"date": "2026-01-05", "hour": 9, "count": 36}, {"date": "2026-01-06", "hour": 9, "count": 57}, {"date": "2026-01-06", "hour": 14, "count": 29}, {"date": "2026-01-06", "hour": 15, "count": 50}, {"date": "2026-01-07", "hour": 7, "count": 121}, {"date": "2026-01-07", "hour": 8, "count": 107}, {"date": "2026-01-07", "hour": 9, "count": 104}, {"date": "2026-01-07", "hour": 11, "count": 40}, {"date": "2026-01-09", "hour": 16, "count": 79}, {"date": "2026-01-11", "hour": 21, "count": 350}, {"date": "2026-01-11", "hour": 22, "count": 35}, {"date": "2026-01-12", "hour": 12, "count": 24}, {"date": "2026-01-13", "hour": 8, "count": 6}, {"date": "2026-01-13", "hour": 9, "count": 11}, {"date": "2026-01-14", "hour": 16, "count": 118}, {"date": "2026-01-14", "hour": 17, "count": 237}, {"date": "2026-01-14", "hour": 20, "count": 95}, {"date": "2026-01-14", "hour": 21, "count": 93}, {"date": "2026-01-15", "hour": 15, "count": 139}, {"date": "2026-01-15", "hour": 16, "count": 89}, {"date": "2026-01-15", "hour": 17, "count": 522}, {"date": "2026-01-15", "hour": 18, "count": 169}, {"date": "2026-01-15", "hour": 20, "count": 10}, {"date": "2026-01-15", "hour": 21, "count": 207}, {"date": "2026-01-16", "hour": 8, "count": 30}, {"date": "2026-01-16", "hour": 9, "count": 16}, {"date": "2026-01-16", "hour": 10, "count": 137}, {"date": "2026-01-17", "hour": 15, "count": 118}, {"date": "2026-01-17", "hour": 16, "count": 47}, {"date": "2026-01-17", "hour": 17, "count": 153}, {"date": "2026-01-17", "hour": 18, "count": 524}, {"date": "2026-01-17", "hour": 19, "count": 212}, {"date": "2026-01-17", "hour": 20, "count": 91}, {"date": "2026-01-17", "hour": 21, "count": 44}, {"date": "2026-01-18", "hour": 11, "count": 12}, {"date": "2026-01-18", "hour": 12, "count": 190}, {"date": "2026-01-18", "hour": 13, "count": 216}, {"date": "2026-01-18", "hour": 14, "count": 120}, {"date": "2026-01-18", "hour": 15, "count": 200}, {"date": "2026-01-18", "hour": 16, "count": 64}, {"date": "2026-01-18", "hour": 17, "count": 86}, {"date": "2026-01-18", "hour": 19, "count": 3}, {"date": "2026-01-18", "hour": 20, "count": 41}, {"date": "2026-01-18", "hour": 21, "count": 118}, {"date": "2026-01-18", "hour": 23, "count": 108}, {"date": "2026-01-21", "hour": 9, "count": 3}, {"date": "2026-01-21", "hour": 15, "count": 23}, {"date": "2026-01-21", "hour": 16, "count": 177}, {"date": "2026-01-21", "hour": 17, "count": 314}, {"date": "2026-01-21", "hour": 18, "count": 351}, {"date": "2026-01-21", "hour": 19, "count": 28}, {"date": "2026-01-21", "hour": 20, "count": 90}, {"date": "2026-01-21", "hour": 21, "count": 513}, {"date": "2026-01-21", "hour": 22, "count": 15}, {"date": "2026-01-22", "hour": 6, "count": 6}, {"date": "2026-01-22", "hour": 16, "count": 170}, {"date": "2026-01-22", "hour": 17, "count": 109}, {"date": "2026-01-22", "hour": 18, "count": 48}, {"date": "2026-01-22", "hour": 19, "count": 102}, {"date": "2026-01-23", "hour": 12, "count": 84}, {"date": "2026-01-23", "hour": 13, "count": 86}, {"date": "2026-01-23", "hour": 14, "count": 3}, {"date": "2026-01-23", "hour": 15, "count": 67}, {"date": "2026-01-23", "hour": 16, "count": 212}, {"date": "2026-01-23", "hour": 17, "count": 312}, {"date": "2026-01-23", "hour": 18, "count": 583}, {"date": "2026-01-23", "hour": 19, "count": 443}, {"date": "2026-01-23", "hour": 20, "count": 94}, {"date": "2026-01-23", "hour": 21, "count": 450}, {"date": "2026-01-25", "hour": 10, "count": 82}, {"date": "2026-01-25", "hour": 11, "count": 137}, {"date": "2026-01-25", "hour": 12, "count": 234}, {"date": "2026-01-25", "hour": 15, "count": 157}, {"date": "2026-01-25", "hour": 16, "count": 256}, {"date": "2026-01-25", "hour": 17, "count": 288}, {"date": "2026-01-25", "hour": 18, "count": 489}, {"date": "2026-01-25", "hour": 19, "count": 85}, {"date": "2026-01-25", "hour": 20, "count": 277}, {"date": "2026-01-25", "hour": 21, "count": 325}, {"date": "2026-01-25", "hour": 22, "count": 309}, {"date": "2026-01-25", "hour": 23, "count": 94}, {"date": "2026-01-26", "hour": 12, "count": 139}, {"date": "2026-01-26", "hour": 17, "count": 170}, {"date": "2026-01-26", "hour": 18, "count": 300}, {"date": "2026-01-26", "hour": 19, "count": 199}, {"date": "2026-01-26", "hour": 21, "count": 123}, {"date": "2026-01-27", "hour": 7, "count": 44}, {"date": "2026-01-27", "hour": 8, "count": 71}, {"date": "2026-01-27", "hour": 9, "count": 62}, {"date": "2026-01-27", "hour": 10, "count": 6}, {"date": "2026-01-27", "hour": 11, "count": 46}, {"date": "2026-01-27", "hour": 13, "count": 6}, {"date": "2026-01-27", "hour": 15, "count": 64}, {"date": "2026-01-27", "hour": 16, "count": 158}, {"date": "2026-01-27", "hour": 20, "count": 64}, {"date": "2026-01-27", "hour": 21, "count": 12}, {"date": "2026-01-27", "hour": 23, "count": 48}, {"date": "2026-01-28", "hour": 7, "count": 14}, {"date": "2026-01-28", "hour": 8, "count": 155}], "by_project": [{"project": "/Users/lars.age.drevland@m10s.io/code/web-application", "sessions": 16, "messages": 8869, "input_tokens": 520831, "output_tokens": 496895, "cache_read": 787425498, "cache_write": 57333258, "tokens": 1017726, "cost_usd": 469.48, "first_seen": "2025-12-22T10:54:46.002Z", "last_seen": "2026-01-27T23:34:31.436Z"}, {"project": "/Users/lars.age.drevland@m10s.io/code/processservice", "sessions": 2, "messages": 257, "input_tokens": 5505, "output_tokens": 653, "cache_read": 12470073, "cache_write": 1296553, "tokens": 6158, "cost_usd": 7.9, "first_seen": "2026-01-17T19:03:56.326Z", "last_seen": "2026-01-26T21:20:05.477Z"}, {"project": "/Users/lars.age.drevland@m10s.io", "sessions": 12, "messages": 240, "input_tokens": 3806, "output_tokens": 909, "cache_read": 6986433, "cache_write": 1268398, "tokens": 4715, "cost_usd": 4.71, "first_seen": "2026-01-23T12:07:36.937Z", "last_seen": "2026-01-28T08:51:25.644Z"}, {"project": "/Users/lars.age.drevland@m10s.io/code/salesservice", "sessions": 2, "messages": 167, "input_tokens": 12992, "output_tokens": 17675, "cache_read": 5891572, "cache_write": 887852, "tokens": 30667, "cost_usd": 4.54, "first_seen": "2026-01-06T14:26:26.370Z", "last_seen": "2026-01-15T20:46:53.368Z"}, {"project": "/Users/lars.age.drevland@m10s.io/code/notification-center", "sessions": 1, "messages": 56, "input_tokens": 706, "output_tokens": 118, "cache_read": 1337922, "cache_write": 741354, "tokens": 824, "cost_usd": 0.96, "first_seen": "2026-01-26T18:39:34.160Z", "last_seen": "2026-01-27T07:38:07.073Z"}, {"project": "/Users/lars.age.drevland@m10s.io/code/notification-center/functions", "sessions": 1, "messages": 54, "input_tokens": 1358, "output_tokens": 120, "cache_read": 2341374, "cache_write": 45549, "tokens": 1478, "cost_usd": 0.74, "first_seen": "2026-01-26T18:40:48.133Z", "last_seen": "2026-01-27T07:40:28.648Z"}, {"project": "/Users/lars.age.drevland@m10s.io/code/activityservice", "sessions": 1, "messages": 30, "input_tokens": 516, "output_tokens": 100, "cache_read": 757563, "cache_write": 61937, "tokens": 616, "cost_usd": 0.46, "first_seen": "2026-01-27T11:49:06.018Z", "last_seen": "2026-01-27T11:58:35.179Z"}, {"project": "/Users/lars.age.drevland@m10s.io/DataGripProjects/sqlserverpro", "sessions": 1, "messages": 19, "input_tokens": 405, "output_tokens": 33, "cache_read": 312762, "cache_write": 91319, "tokens": 438, "cost_usd": 0.27, "first_seen": "2026-01-18T13:04:43.678Z", "last_seen": "2026-01-18T13:31:24.259Z"}], "by_model": [{"model": "claude-opus-4-5-20251101", "messages": 9010, "input_tokens": 347777, "output_tokens": 497834, "cache_read": 793613949, "cache_write": 58416538, "cost_usd": 484.01}, {"model": "claude-haiku-4-5-20251001", "messages": 517, "input_tokens": 195659, "output_tokens": 16849, "cache_read": 19186031, "cache_write": 2113871, "cost_usd": 2.73}, {"model": "claude-sonnet-4-5-20250929", "messages": 161, "input_tokens": 2671, "output_tokens": 393, "cache_read": 4723217, "cache_write": 1180522, "cost_usd": 2.32}, {"model": "claude-3-5-haiku-20241022", "messages": 4, "input_tokens": 12, "output_tokens": 1427, "cache_read": 0, "cache_write": 15289, "cost_usd": 0.01}], "by_tool": [{"tool_name": "Read", "calls": 1031, "is_mcp": false}, {"tool_name": "Bash", "calls": 1019, "is_mcp": false}, {"tool_name": "Edit", "calls": 945, "is_mcp": false}, {"tool_name": "Grep", "calls": 638, "is_mcp": false}, {"tool_name": "Glob", "calls": 153, "is_mcp": false}, {"tool_name": "TodoWrite", "calls": 126, "is_mcp": false}, {"tool_name": "Write", "calls": 46, "is_mcp": false}, {"tool_name": "Task", "calls": 11, "is_mcp": false}, {"tool_name": "mcp__chrome-devtools__performance_start_trace", "calls": 9, "is_mcp": true}, {"tool_name": "mcp__chrome-devtools__new_page", "calls": 7, "is_mcp": true}, {"tool_name": "Skill", "calls": 5, "is_mcp": false}, {"tool_name": "mcp__chrome-devtools__list_pages", "calls": 4, "is_mcp": true}, {"tool_name": "AskUserQuestion", "calls": 4, "is_mcp": false}, {"tool_name": "mcp__chrome-devtools__navigate_page", "calls": 3, "is_mcp": true}, {"tool_name": "WebSearch", "calls": 3, "is_mcp": false}, {"tool_name": "mcp__chrome-devtools__take_snapshot", "calls": 2, "is_mcp": true}, {"tool_name": "mcp__chrome-devtools__performance_stop_trace", "calls": 2, "is_mcp": true}, {"tool_name": "WebFetch", "calls": 2, "is_mcp": false}, {"tool_name": "TaskOutput", "calls": 2, "is_mcp": false}, {"tool_name": "TaskUpdate", "calls": 2, "is_mcp": false}, {"tool_name": "mcp__atlassian__getAccessibleAtlassianResources", "calls": 2, "is_mcp": true}, {"tool_name": "mcp__atlassian__searchJiraIssuesUsingJql", "calls": 2, "is_mcp": true}, {"tool_name": "TaskCreate", "calls": 1, "is_mcp": false}, {"tool_name": "mcp__atlassian__search", "calls": 1, "is_mcp": true}, {"tool_name": "mcp__atlassian__atlassianUserInfo", "calls": 1, "is_mcp": true}, {"tool_name": "ExitPlanMode", "calls": 1, "is_mcp": false}, {"tool_name": "mcp__ide__getDiagnostics", "calls": 1, "is_mcp": true}, {"tool_name": "mcp__chrome-devtools__evaluate_script", "calls": 1, "is_mcp": true}, {"tool_name": "EnterPlanMode", "calls": 1, "is_mcp": false}, {"tool_name": "TaskList", "calls": 1, "is_mcp": false}, {"tool_name": "mcp__chrome-devtools__click", "calls": 1, "is_mcp": true}, {"tool_name": "TaskStop", "calls": 1, "is_mcp": false}], "by_mcp": [{"mcp_server": "chrome-devtools", "calls": 29}, {"mcp_server": "atlassian", "calls": 6}, {"mcp_server": "ide", "calls": 1}], "by_skill": [{"skill": "openspec:list", "invocations": 2}, {"skill": "meta:show-me-the-money", "invocations": 1}, {"skill": "openspec:archive", "invocations": 1}, {"skill": "openspec:proposal", "invocations": 1}], "by_subagent": [{"agent_type": "Explore", "spawns": 11}], "user_commands": [{"command": "/plugin", "count": 6}, {"command": "/context", "count": 4}, {"command": "/exit", "count": 3}, {"command": "/clear", "count": 1}, {"command": "/mcp", "count": 1}, {"command": "/terminal-setup", "count": 1}, {"command": "/chrome", "count": 1}], "compaction": {"compaction_count": 23}, "errors": [], "error_count": {"api_errors": 0, "system_errors": 0}, "session_extremes": {"max_duration_mins": 21544.03225, "avg_duration_mins": 756.5102710526315, "max_messages": 2478, "avg_messages": 170.03508771929825, "max_tokens": 402643}, "subagent_stats": {"sidechain_messages": 533, "unique_agents": 22}, "edit_read_ratio": {"edit_calls": 991, "read_calls": 1822}, "git_commands": [{"git_command": "git checkout", "count": 7}, {"git_command": "git branch", "count": 6}, {"git_command": "git push", "count": 2}, {"git_command": "git add", "count": 2}, {"git_command": "git commit", "count": 1}], "git_by_project": [{"project": "/Users/lars.age.drevland@m10s.io/code/web-application", "pushes": 0, "commits": 0, "prs": 0, "pr_merges": 0, "total_git": 57}, {"project": "/Users/lars.age.drevland@m10s.io/code/processservice", "pushes": 2, "commits": 1, "prs": 0, "pr_merges": 0, "total_git": 14}, {"project": "/Users/lars.age.drevland@m10s.io/code/activityservice", "pushes": 0, "commits": 0, "prs": 0, "pr_merges": 0, "total_git": 4}, {"project": "/Users/lars.age.drevland@m10s.io/code/salesservice", "pushes": 0, "commits": 0, "prs": 0, "pr_merges": 0, "total_git": 3}, {"project": "/Users/lars.age.drevland@m10s.io", "pushes": 0, "commits": 0, "prs": 0, "pr_merges": 0, "total_git": 3}], "bash_commands": [{"cmd": "yarn", "count": 456}, {"cmd": "grep", "count": 83}, {"cmd": "ls", "count": 51}, {"cmd": "cd", "count": 50}, {"cmd": "openspec", "count": 48}, {"cmd": "find", "count": 45}, {"cmd": "npx", "count": 37}, {"cmd": "dotnet", "count": 35}, {"cmd": "nx", "count": 24}, {"cmd": "sleep", "count": 16}, {"cmd": "tail", "count": 12}, {"cmd": "python3", "count": 10}, {"cmd": "duckdb", "count": 7}, {"cmd": "firebase", "count": 7}, {"cmd": "cp", "count": 6}], "exotic_commands": [{"cmd": "for", "count": 1}, {"cmd": "kill", "count": 1}, {"cmd": "pgrep", "count": 1}, {"cmd": "pkill", "count": 1}, {"cmd": "uv", "count": 1}, {"cmd": "lsof", "count": 2}, {"cmd": "firebase", "count": 7}], "tool_errors": [{"error_type": "error", "count": 106}, {"error_type": "failed", "count": 100}, {"error_type": "timeout", "count": 29}, {"error_type": "file not found", "count": 8}, {"error_type": "permission denied", "count": 6}, {"error_type": "command not found", "count": 6}, {"error_type": "syntax error", "count": 3}], "projects_list": ["/Users/lars.age.drevland@m10s.io", "/Users/lars.age.drevland@m10s.io/DataGripProjects/sqlserverpro", "/Users/lars.age.drevland@m10s.io/code/activityservice", "/Users/lars.age.drevland@m10s.io/code/notification-center", "/Users/lars.age.drevland@m10s.io/code/notification-center/functions", "/Users/lars.age.drevland@m10s.io/code/processservice", "/Users/lars.age.drevland@m10s.io/code/salesservice", "/Users/lars.age.drevland@m10s.io/code/web-application"], "productivity": {"most_productive_hour": 17, "peak_hour_tokens": 88015, "max_streak": 1}, "working_style": {"night_owl_pct": 4.3, "weekend_pct": 38.3}, "session_lengths": {"quick_sessions": 17, "medium_sessions": 8, "long_sessions": 16, "avg_turns_per_session": 103.02439024390245}, "cost_by_weekday": [{"dow": 0, "day_name": "Sun", "input_tokens": 254111, "output_tokens": 144768, "cache_read": 260439376}, {"dow": 1, "day_name": "Mon", "input_tokens": 46677, "output_tokens": 39932, "cache_read": 65826681}, {"dow": 2, "day_name": "Tue", "input_tokens": 65917, "output_tokens": 13391, "cache_read": 24693816}, {"dow": 3, "day_name": "Wed", "input_tokens": 38557, "output_tokens": 88968, "cache_read": 141104117}, {"dow": 4, "day_name": "Thu", "input_tokens": 35632, "output_tokens": 98359, "cache_read": 97521543}, {"dow": 5, "day_name": "Fri", "input_tokens": 87509, "output_tokens": 29518, "cache_read": 158188726}, {"dow": 6, "day_name": "Sat", "input_tokens": 17716, "output_tokens": 101567, "cache_read": 69748938}], "tool_sequences": [{"sequence": "Bash \u2192 Bash", "count": 568}, {"sequence": "Edit \u2192 Edit", "count": 443}, {"sequence": "Read \u2192 Edit", "count": 369}, {"sequence": "Read \u2192 Read", "count": 317}, {"sequence": "Grep \u2192 Grep", "count": 290}, {"sequence": "Edit \u2192 Bash", "count": 217}, {"sequence": "Grep \u2192 Read", "count": 213}, {"sequence": "Bash \u2192 Read", "count": 202}, {"sequence": "Edit \u2192 Read", "count": 187}, {"sequence": "Read \u2192 Grep", "count": 154}], "user_message_stats": {"total_words": 87628, "longest_message_chars": 13930, "thank_you_count": 0}, "streak_days": 8, "discipline": {"todo_writes": 126, "enter_plan_mode": 1, "exit_plan_mode": 1, "skill_invocations": 5}, "research": {"web_searches": 3, "web_fetches": 2, "user_questions": 4}, "config_edits": {"project_claude_md_edits": 0, "global_claude_md_edits": 0, "settings_edits": 2}, "daily_averages": {"active_days": 20, "avg_sessions_per_day": 2.8, "avg_messages_per_day": 229.7, "avg_tokens_per_day": 53131.0, "avg_cost_per_day": 24.45, "total_cost": 489.06}, "context_usage": {"avg_max_context": 73351.0, "highest_context": 154859, "median_context": 39795.0, "p90_context": 154490.0, "p95_context": 154741.0, "session_count": 33}, "tool_failure_count": {"tool_failures": 130, "total_tool_results": 4024}, "error_analysis": {"total_tool_calls": 4024, "total_errors": 130, "real_errors": 126, "warmup_errors": 4, "user_cancelled": 0, "real_error_rate": 3.1}, "error_categories": [{"category": "Command failed", "count": 55}, {"category": "Other", "count": 39}, {"category": "Path not found", "count": 31}, {"category": "HTTP 404", "count": 1}], "error_rate_by_tool": [{"tool_name": "Bash", "errors": 62, "total": 1018, "error_rate": 6.1}, {"tool_name": "Grep", "errors": 17, "total": 638, "error_rate": 2.7}, {"tool_name": "Write", "errors": 1, "total": 46, "error_rate": 2.2}, {"tool_name": "Edit", "errors": 17, "total": 945, "error_rate": 1.8}, {"tool_name": "Read", "errors": 19, "total": 1031, "error_rate": 1.8}, {"tool_name": "Glob", "errors": 0, "total": 151, "error_rate": 0.0}], "fun_facts": [{"emoji": "\u23f0", "text": "Peak productivity: 6pm"}, {"emoji": "\ud83d\udcc5", "text": "Most active day: Suns"}, {"emoji": "\u26a1", "text": "Average session: 756 minutes"}, {"emoji": "\ud83d\udd27", "text": "Favorite tool: Read (1,031 calls)"}, {"emoji": "\ud83d\udcbe", "text": "Cache hit rate: 93%"}, {"emoji": "\ud83d\udddc\ufe0f", "text": "Compacted 23 times (56% of sessions)"}, {"emoji": "\ud83e\udd16", "text": "Spawned 22 subagents (533 messages)"}, {"emoji": "\ud83d\udd0d", "text": "Explorer mode: 1.8x more reads than edits"}, {"emoji": "\ud83d\udcdd", "text": "Made 1 commits, 2 pushes"}, {"emoji": "\ud83d\udcc1", "text": "Top project: application (8,869 messages)"}, {"emoji": "\ud83d\udcac", "text": "Wrote 87,628 words to Claude"}, {"emoji": "\ud83d\udcdc", "text": "Longest message: 13,930 characters"}]};
+    </script>
+
+    <script>
+        // Chart.js defaults
+        Chart.defaults.color = '#a1a1aa';
+        Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
+        Chart.defaults.font.family = "'Outfit', system-ui, sans-serif";
+
+        // Utility functions
+        function formatNumber(n) {
+            if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+            if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+            if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+            return n.toLocaleString();
+        }
+
+        // GCP Vertex AI pricing (per 1M tokens)
+        // https://cloud.google.com/vertex-ai/generative-ai/pricing
+        // Note: cacheWrite is the PREMIUM (0.25x base), not full cache write price
+        const PRICING = {
+            // 4.5 models
+            'opus-4.5':   { input: 5,    output: 25,   cacheRead: 0.50,  cacheWrite: 1.25 },
+            'sonnet-4.5': { input: 3,    output: 15,   cacheRead: 0.30,  cacheWrite: 0.75 },
+            'haiku-4.5':  { input: 1,    output: 5,    cacheRead: 0.10,  cacheWrite: 0.25 },
+            // 4.x models
+            'opus-4':     { input: 15,   output: 75,   cacheRead: 1.50,  cacheWrite: 3.75 },
+            'sonnet-4':   { input: 3,    output: 15,   cacheRead: 0.30,  cacheWrite: 0.75 },
+            // 3.x models
+            'sonnet-3':   { input: 3,    output: 15,   cacheRead: 0.30,  cacheWrite: 0.75 },
+            'haiku-3.5':  { input: 0.80, output: 4,    cacheRead: 0.08,  cacheWrite: 0.20 },
+            'haiku-3':    { input: 0.25, output: 1.25, cacheRead: 0.025, cacheWrite: 0.0625 },
+            'opus-3':     { input: 15,   output: 75,   cacheRead: 1.50,  cacheWrite: 3.75 },
+        };
+
+        function getModelType(modelName) {
+            if (!modelName) return 'sonnet-4.5';
+            const lower = modelName.toLowerCase();
+            // Check 4.5 models first (most specific)
+            if (lower.includes('opus-4-5') || lower.includes('opus-4.5')) return 'opus-4.5';
+            if (lower.includes('sonnet-4-5') || lower.includes('sonnet-4.5')) return 'sonnet-4.5';
+            if (lower.includes('haiku-4-5') || lower.includes('haiku-4.5')) return 'haiku-4.5';
+            // Check 4.x models
+            if (lower.includes('opus-4')) return 'opus-4';
+            if (lower.includes('sonnet-4')) return 'sonnet-4';
+            // Check 3.x models
+            if (lower.includes('haiku-3-5') || lower.includes('haiku-3.5')) return 'haiku-3.5';
+            if (lower.includes('haiku-3') || lower.includes('haiku')) return 'haiku-3';
+            if (lower.includes('sonnet-3') || lower.includes('sonnet')) return 'sonnet-3';
+            if (lower.includes('opus-3') || lower.includes('opus')) return 'opus-3';
+            return 'sonnet-4.5';
+        }
+
+        function formatCostFromModels(byModel, meta) {
+            // Sum pre-computed cost_usd from each model (computed by backend using COST_SQL)
+            // This is accurate because it uses each model's actual token mix
+            const total = (byModel || []).reduce((sum, m) => sum + (m.cost_usd || 0), 0);
+            return '$' + total.toFixed(0);
+        }
+
+        function getDateRange(data) {
+            const meta = data.meta || {};
+            const filters = data.filters || {};
+            const earliest = meta.earliest ? new Date(meta.earliest) : null;
+            const latest = meta.latest ? new Date(meta.latest) : null;
+            if (!earliest || !latest) return 'No data';
+
+            const days = Math.ceil((latest - earliest) / (1000 * 60 * 60 * 24));
+            const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            let range = `${fmt(earliest)} → ${fmt(latest)} (${days} days)`;
+
+            // Show active filters
+            const activeFilters = [];
+            if (filters.date_from) activeFilters.push(`from ${filters.date_from}`);
+            if (filters.date_to) activeFilters.push(`to ${filters.date_to}`);
+            if (filters.project) activeFilters.push(`project: ${filters.project}`);
+            if (activeFilters.length > 0) {
+                range += ` • Filtered: ${activeFilters.join(', ')}`;
+            }
+
+            return range;
+        }
+
+        // Render functions
+        function renderBigNumbers(data) {
+            const meta = data.meta || {};
+            const originalMeta = STATS_DATA.meta || {};
+            const byTool = data.by_tool || [];
+            const byModel = data.by_model || [];
+
+            const totalMessages = (meta.total_user_messages || 0) + (meta.total_assistant_messages || 0);
+
+            // Billed tokens = input + output (not including cache reads, which are replay)
+            const inputTokens = meta.total_input_tokens || 0;
+            const outputTokens = meta.total_output_tokens || 0;
+            const cacheWrite = meta.total_cache_write || 0;
+            const cacheRead = meta.total_cache_read || 0;
+
+            // For billing: input + output + cache_write (cache_read is cheaper but still billed)
+            const billedTokens = inputTokens + outputTokens + cacheWrite;
+
+            // Scale tool calls proportionally based on filtered vs original messages
+            const originalMessages = (originalMeta.total_user_messages || 0) + (originalMeta.total_assistant_messages || 0);
+            const messageRatio = originalMessages > 0 ? totalMessages / originalMessages : 1;
+            const rawToolCalls = byTool.reduce((sum, t) => sum + (t.calls || 0), 0);
+            const totalTools = Math.round(rawToolCalls * messageRatio);
+
+            document.getElementById('date-range').textContent = getDateRange(data);
+            document.getElementById('total-sessions').textContent = formatNumber(meta.total_sessions || 0);
+            document.getElementById('total-messages').textContent = formatNumber(totalMessages);
+            document.getElementById('total-tokens').textContent = formatNumber(billedTokens);
+            document.getElementById('tokens-label').textContent = `Billed (${formatNumber(cacheRead)} cached)`;
+            document.getElementById('total-cost').textContent = formatCostFromModels(byModel, meta);
+            document.getElementById('total-tools').textContent = formatNumber(totalTools);
+        }
+
+        function renderHeatmap(data) {
+            const heatmapData = data.heatmap || [];
+            const container = document.getElementById('heatmap');
+            const monthsContainer = document.getElementById('heatmap-months');
+            container.innerHTML = '';
+            monthsContainer.innerHTML = '';
+
+            // Group by date, aggregate hours
+            const byDate = {};
+            heatmapData.forEach(d => {
+                if (!byDate[d.date]) byDate[d.date] = 0;
+                byDate[d.date] += d.count || 0;
+            });
+
+            // Get date range
+            const dates = Object.keys(byDate).sort();
+            if (dates.length === 0) return;
+
+            const startDate = new Date(dates[0]);
+            const endDate = new Date(dates[dates.length - 1]);
+
+            // Find max for scaling
+            const maxCount = Math.max(...Object.values(byDate), 1);
+
+            // Month names
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+            // Track weeks and their months for labels
+            const weeks = [];
+            let weekIndex = 0;
+
+            // Generate weeks
+            const current = new Date(startDate);
+            // Adjust to start of week (Monday)
+            const dayOfWeek = current.getDay();
+            current.setDate(current.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+
+            while (current <= endDate) {
+                const weekDiv = document.createElement('div');
+                weekDiv.className = 'heatmap-week';
+
+                // Track the first day of this week for month label
+                const weekStart = new Date(current);
+                weeks.push({ month: weekStart.getMonth(), year: weekStart.getFullYear() });
+
+                for (let d = 0; d < 7; d++) {
+                    const dateStr = current.toISOString().slice(0, 10);
+                    const count = byDate[dateStr] || 0;
+                    const level = count === 0 ? 0 : Math.min(5, Math.ceil((count / maxCount) * 5));
+
+                    const cell = document.createElement('div');
+                    cell.className = `heatmap-cell level-${level}`;
+                    cell.dataset.date = dateStr;
+                    cell.dataset.count = count;
+
+                    cell.addEventListener('mouseenter', showTooltip);
+                    cell.addEventListener('mouseleave', hideTooltip);
+
+                    weekDiv.appendChild(cell);
+                    current.setDate(current.getDate() + 1);
+                }
+
+                container.appendChild(weekDiv);
+                weekIndex++;
+            }
+
+            // Generate month labels
+            // Cell width is 14px + 3px gap = 17px per week
+            const cellWidth = 17;
+            let lastMonth = -1;
+            let lastYear = -1;
+
+            weeks.forEach((week, idx) => {
+                if (week.month !== lastMonth || week.year !== lastYear) {
+                    const label = document.createElement('div');
+                    label.className = 'heatmap-month';
+                    label.textContent = monthNames[week.month];
+
+                    // Calculate width until next month change
+                    let weeksInMonth = 1;
+                    for (let j = idx + 1; j < weeks.length; j++) {
+                        if (weeks[j].month === week.month && weeks[j].year === week.year) {
+                            weeksInMonth++;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    label.style.width = `${weeksInMonth * cellWidth}px`;
+                    monthsContainer.appendChild(label);
+
+                    lastMonth = week.month;
+                    lastYear = week.year;
+                }
+            });
+        }
+
+        function renderHourlyChart(data) {
+            const hourlyData = data.activity_by_hour || [];
+            const ctx = document.getElementById('hourly-chart').getContext('2d');
+
+            // Fill in missing hours
+            const hours = Array.from({ length: 24 }, (_, i) => {
+                const found = hourlyData.find(h => h.hour === i);
+                return found ? found.messages : 0;
+            });
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0')),
+                    datasets: [{
+                        data: hours,
+                        backgroundColor: 'rgba(245, 158, 11, 0.6)',
+                        borderColor: '#F59E0B',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#1a1a1e',
+                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderWidth: 1,
+                            titleFont: { family: 'JetBrains Mono' },
+                            bodyFont: { family: 'JetBrains Mono' },
+                            callbacks: {
+                                title: (items) => `${items[0].label}:00`,
+                                label: (item) => `${item.raw.toLocaleString()} messages`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                font: { family: 'JetBrains Mono', size: 10 },
+                                maxRotation: 0,
+                                callback: (val, idx) => idx % 4 === 0 ? idx.toString().padStart(2, '0') : ''
+                            }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.03)' },
+                            ticks: {
+                                font: { family: 'JetBrains Mono', size: 10 },
+                                callback: (val) => formatNumber(val)
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderTokensChart(data) {
+            const dailyData = data.activity_by_day || [];
+            const ctx = document.getElementById('tokens-chart').getContext('2d');
+
+            const labels = dailyData.map(d => d.date);
+            const tokens = dailyData.map(d => (d.input_tokens || 0) + (d.output_tokens || 0));
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: tokens,
+                        borderColor: '#F59E0B',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        pointHoverBackgroundColor: '#F59E0B',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#1a1a1e',
+                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderWidth: 1,
+                            titleFont: { family: 'JetBrains Mono' },
+                            bodyFont: { family: 'JetBrains Mono' },
+                            callbacks: {
+                                label: (item) => `${formatNumber(item.raw)} tokens`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                font: { family: 'JetBrains Mono', size: 10 },
+                                maxTicksLimit: 6,
+                                callback: (val, idx) => {
+                                    const date = new Date(labels[idx]);
+                                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                }
+                            }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.03)' },
+                            ticks: {
+                                font: { family: 'JetBrains Mono', size: 10 },
+                                callback: (val) => formatNumber(val)
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderBarList(containerId, items, maxItems = 6, colorScheme = 'amber') {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+
+            const colors = {
+                amber: 'linear-gradient(90deg, #F59E0B, #fbbf24)',
+                blue: 'linear-gradient(90deg, #3b82f6, #60a5fa)',
+                green: 'linear-gradient(90deg, #10b981, #34d399)',
+                purple: 'linear-gradient(90deg, #8b5cf6, #a78bfa)',
+                cyan: 'linear-gradient(90deg, #06b6d4, #22d3ee)',
+                red: 'linear-gradient(90deg, #ef4444, #f87171)',
+            };
+
+            const sorted = items.slice(0, maxItems);
+            const maxVal = Math.max(...sorted.map(i => i.value || i.calls || i.messages || 0), 1);
+
+            sorted.forEach(item => {
+                const name = item.name || item.tool_name || item.project || item.mcp_server || 'Unknown';
+                const value = item.value || item.calls || item.messages || 0;
+                const pct = (value / maxVal) * 100;
+
+                // Smarter name display: get last meaningful part
+                let displayName = name;
+                if (name.includes('-')) {
+                    const parts = name.split('-');
+                    displayName = parts.slice(-2).join('-'); // Last 2 parts
+                }
+                displayName = displayName.slice(0, 15);
+
+                const div = document.createElement('div');
+                div.className = 'bar-item';
+                div.innerHTML = `
+                    <span class="bar-label" title="${name}">${displayName}</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width: ${pct}%; background: ${colors[colorScheme]}"></div>
+                    </div>
+                    <span class="bar-value">${formatNumber(value)}</span>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function renderModelsChart(data) {
+            const modelsData = data.by_model || [];
+            const ctx = document.getElementById('models-chart').getContext('2d');
+            const legendContainer = document.getElementById('models-legend');
+
+            // Simplify model names
+            const colors = ['#F59E0B', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444'];
+            const processed = modelsData.slice(0, 5).map((m, i) => {
+                let name = m.model || 'Unknown';
+                if (name.includes('opus')) name = 'Opus';
+                else if (name.includes('sonnet')) name = 'Sonnet';
+                else if (name.includes('haiku')) name = 'Haiku';
+                return { name, messages: m.messages || 0, color: colors[i] };
+            });
+
+            const total = processed.reduce((sum, m) => sum + m.messages, 0);
+
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: processed.map(m => m.name),
+                    datasets: [{
+                        data: processed.map(m => m.messages),
+                        backgroundColor: processed.map(m => m.color),
+                        borderWidth: 0,
+                        cutout: '65%',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#1a1a1e',
+                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderWidth: 1,
+                        }
+                    }
+                }
+            });
+
+            // Render legend
+            legendContainer.innerHTML = processed.map(m => `
+                <div class="donut-legend-item">
+                    <div class="donut-legend-color" style="background: ${m.color}"></div>
+                    <span class="donut-legend-label">${m.name}</span>
+                    <span class="donut-legend-value">${((m.messages / total) * 100).toFixed(0)}%</span>
+                </div>
+            `).join('');
+        }
+
+        function renderListItems(containerId, items, maxItems = 5, showFullName = false) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+
+            items.slice(0, maxItems).forEach(item => {
+                const name = item.skill || item.agent_type || item.name || 'Unknown';
+                const value = item.invocations || item.spawns || item.count || 0;
+
+                // Show full name for skills, truncate for display
+                const displayName = showFullName ? name : name.split(':').pop();
+
+                const div = document.createElement('div');
+                div.className = 'list-item';
+                div.innerHTML = `
+                    <span class="list-item-name" title="${name}">${displayName.slice(0, 25)}</span>
+                    <span class="list-item-value">${value}</span>
+                `;
+                container.appendChild(div);
+            });
+
+            if (items.length === 0) {
+                container.innerHTML = '<div class="list-item"><span class="list-item-name" style="color: var(--text-muted)">None</span></div>';
+            }
+        }
+
+        function renderFunFacts(data) {
+            const container = document.getElementById('fun-facts');
+            const facts = data.fun_facts || [];
+
+            container.innerHTML = facts.map(f => `
+                <div class="fun-fact">
+                    <span class="fun-fact-emoji">${f.emoji}</span>
+                    <span class="fun-fact-text">${f.text}</span>
+                </div>
+            `).join('');
+
+            if (facts.length === 0) {
+                container.innerHTML = '<div class="fun-fact"><span class="fun-fact-text" style="color: var(--text-muted)">Not enough data for fun facts yet!</span></div>';
+            }
+        }
+
+        function renderWorkingStyle(data) {
+            const style = data.working_style || {};
+            const sessions = data.session_lengths || {};
+            const streak = data.streak_days || 0;
+
+            document.getElementById('night-owl-pct').textContent = (style.night_owl_pct || 0).toFixed(0) + '%';
+            document.getElementById('weekend-pct').textContent = (style.weekend_pct || 0).toFixed(0) + '%';
+            document.getElementById('streak-days').textContent = streak + ' days';
+            document.getElementById('avg-turns').textContent = (sessions.avg_turns_per_session || 0).toFixed(0);
+
+            // Session types
+            document.getElementById('quick-sessions').textContent = formatNumber(sessions.quick_sessions || 0);
+            document.getElementById('medium-sessions').textContent = formatNumber(sessions.medium_sessions || 0);
+            document.getElementById('long-sessions').textContent = formatNumber(sessions.long_sessions || 0);
+        }
+
+        function renderToolSequences(data) {
+            const sequences = data.tool_sequences || [];
+            renderBarList('tool-sequences-list', sequences.map(s => ({ name: s.sequence, value: s.count })), 5, 'purple');
+        }
+
+        function renderDailyAverages(data) {
+            const daily = data.daily_averages || {};
+
+            document.getElementById('active-days').textContent = formatNumber(daily.active_days || 0);
+            document.getElementById('avg-sessions-day').textContent = daily.avg_sessions_per_day || '-';
+            document.getElementById('avg-tokens-day').textContent = formatNumber(daily.avg_tokens_per_day || 0);
+            document.getElementById('avg-cost-day').textContent = '$' + (daily.avg_cost_per_day || 0).toFixed(2);
+        }
+
+        function renderContextUsage(data) {
+            const ctx = data.context_usage || {};
+            const failures = data.tool_failure_count || {};
+
+            // Format context as K tokens with percentage of 200K window
+            const formatContext = (tokens) => {
+                if (!tokens) return '-';
+                const k = tokens / 1000;
+                const pct = (tokens / 200000 * 100).toFixed(0);
+                return formatNumber(tokens) + ' (' + pct + '%)';
+            };
+
+            document.getElementById('avg-context').textContent = formatContext(ctx.avg_max_context);
+            document.getElementById('median-context').textContent = formatContext(ctx.median_context);
+            document.getElementById('p90-context').textContent = formatContext(ctx.p90_context);
+            document.getElementById('tool-failures').textContent = formatNumber(failures.tool_failures || 0);
+        }
+
+        function getShortProjectName(fullPath) {
+            // Extract last 1-2 meaningful path segments
+            if (!fullPath) return 'Unknown';
+            const parts = fullPath.split('/').filter(p => p && p !== 'Users');
+            if (parts.length === 0) return 'Unknown';
+            // Skip username, get last 2 meaningful parts
+            const meaningful = parts.slice(-2);
+            return meaningful.join('/');
+        }
+
+        function renderProjectsList(data) {
+            const projects = (data.by_project || []).filter(p => p.project && !p.project.includes('subagent'));
+            const container = document.getElementById('projects-list');
+            container.innerHTML = '';
+
+            const maxCost = Math.max(...projects.map(p => p.cost_usd || 0), 1);
+
+            projects.slice(0, 6).forEach(p => {
+                const cost = p.cost_usd || 0;
+                const pct = (cost / maxCost) * 100;
+                const displayName = getShortProjectName(p.project);
+
+                const div = document.createElement('div');
+                div.className = 'bar-item';
+                div.innerHTML = `
+                    <span class="bar-label" title="${p.project}">${displayName.slice(0, 20)}</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width: ${pct}%; background: linear-gradient(90deg, #3b82f6, #60a5fa)"></div>
+                    </div>
+                    <span class="bar-value">$${cost.toFixed(0)}</span>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function renderWorkflows(data) {
+            const discipline = data.discipline || {};
+            const research = data.research || {};
+            const config = data.config_edits || {};
+            const compaction = data.compaction || {};
+            const editRead = data.edit_read_ratio || {};
+            const subagents = data.by_subagent || [];
+
+            // Discipline stats
+            document.getElementById('todo-writes').textContent = formatNumber(discipline.todo_writes || 0);
+            document.getElementById('plan-mode').textContent = formatNumber((discipline.enter_plan_mode || 0) + (discipline.exit_plan_mode || 0));
+            document.getElementById('skill-invocations').textContent = formatNumber(discipline.skill_invocations || 0);
+            document.getElementById('subagent-spawns').textContent = formatNumber(subagents.reduce((sum, s) => sum + (s.spawns || 0), 0));
+
+            // Research stats
+            document.getElementById('web-searches').textContent = formatNumber(research.web_searches || 0);
+            document.getElementById('web-fetches').textContent = formatNumber(research.web_fetches || 0);
+            document.getElementById('user-questions').textContent = formatNumber(research.user_questions || 0);
+
+            // Read:Edit ratio
+            const reads = editRead.read_calls || 0;
+            const edits = editRead.edit_calls || 0;
+            const ratio = edits > 0 ? (reads / edits).toFixed(1) : '∞';
+            document.getElementById('read-ratio').textContent = ratio + ':1';
+
+            // Config stats
+            document.getElementById('project-claude-md').textContent = formatNumber(config.project_claude_md_edits || 0);
+            document.getElementById('global-claude-md').textContent = formatNumber(config.global_claude_md_edits || 0);
+            document.getElementById('settings-edits').textContent = formatNumber(config.settings_edits || 0);
+            document.getElementById('compactions').textContent = formatNumber(compaction.compaction_count || 0);
+        }
+
+        function renderWeekdayChart(data) {
+            const weekdayData = data.cost_by_weekday || [];
+            const container = document.getElementById('weekday-chart');
+
+            if (weekdayData.length === 0) {
+                container.innerHTML = '<div style="color: var(--text-muted); text-align: center;">No data</div>';
+                return;
+            }
+
+            // Calculate costs
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const costs = days.map(day => {
+                const d = weekdayData.find(w => w.day_name === day);
+                if (!d) return 0;
+                const input = d.input_tokens || 0;
+                const output = d.output_tokens || 0;
+                // Approximate cost using Sonnet pricing
+                return (input / 1e6) * 3 + (output / 1e6) * 15;
+            });
+
+            const maxCost = Math.max(...costs, 1);
+
+            container.innerHTML = days.map((day, i) => {
+                const cost = costs[i];
+                const height = Math.max(4, (cost / maxCost) * 80);
+                return `
+                    <div class="weekday-bar">
+                        <div class="weekday-bar-value">$${cost.toFixed(0)}</div>
+                        <div class="weekday-bar-fill" style="height: ${height}px;"></div>
+                        <div class="weekday-bar-label">${day}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderErrorAnalysis(data) {
+            const analysis = data.error_analysis || {};
+            const categories = data.error_categories || [];
+            const byTool = data.error_rate_by_tool || [];
+
+            // Summary stats
+            document.getElementById('total-tool-calls').textContent = formatNumber(analysis.total_tool_calls || 0);
+            document.getElementById('real-errors').textContent = formatNumber(analysis.real_errors || 0);
+            document.getElementById('error-rate').textContent = (analysis.real_error_rate || 0) + '%';
+            document.getElementById('warmup-errors').textContent = formatNumber(analysis.warmup_errors || 0);
+
+            // Error categories bar list
+            const catContainer = document.getElementById('error-categories-list');
+            if (categories.length === 0) {
+                catContainer.innerHTML = '<div style="color: var(--text-muted);">No errors</div>';
+            } else {
+                const maxCount = Math.max(...categories.map(c => c.count || 0), 1);
+                catContainer.innerHTML = categories.slice(0, 5).map(c => {
+                    const pct = ((c.count || 0) / maxCount) * 100;
+                    return `
+                        <div class="bar-item">
+                            <span class="bar-label">${c.category}</span>
+                            <div class="bar-track">
+                                <div class="bar-fill" style="width: ${pct}%; background: linear-gradient(90deg, #ef4444, #f87171)"></div>
+                            </div>
+                            <span class="bar-value">${c.count}</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Error rate by tool
+            const toolContainer = document.getElementById('error-rate-by-tool-list');
+            if (byTool.length === 0) {
+                toolContainer.innerHTML = '<div style="color: var(--text-muted);">No data</div>';
+            } else {
+                const maxRate = Math.max(...byTool.map(t => t.error_rate || 0), 1);
+                toolContainer.innerHTML = byTool.slice(0, 6).map(t => {
+                    const pct = ((t.error_rate || 0) / maxRate) * 100;
+                    return `
+                        <div class="bar-item">
+                            <span class="bar-label">${t.tool_name}</span>
+                            <div class="bar-track">
+                                <div class="bar-fill" style="width: ${pct}%; background: linear-gradient(90deg, #f59e0b, #fbbf24)"></div>
+                            </div>
+                            <span class="bar-value">${t.error_rate}%</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        function renderCommandsAndMCP(data) {
+            const mcpData = data.by_mcp || [];
+            const gitData = data.git_commands || [];
+            const bashData = data.bash_commands || [];
+            const row = document.getElementById('commands-row');
+            const gitSection = document.getElementById('git-section');
+            const bashSection = document.getElementById('bash-section');
+            const mcpSection = document.getElementById('mcp-section');
+
+            const hasGit = gitData.length > 0;
+            const hasBash = bashData.length > 0;
+            const hasMCP = mcpData.length > 0;
+
+            if (!hasGit && !hasBash && !hasMCP) {
+                row.style.display = 'none';
+                return;
+            }
+
+            row.style.display = 'grid';
+
+            if (hasGit) {
+                gitSection.style.display = 'block';
+                renderBarList('git-list', gitData.map(g => ({ name: g.git_command, value: g.count })), 6, 'green');
+            } else {
+                gitSection.style.display = 'none';
+            }
+
+            if (hasBash) {
+                bashSection.style.display = 'block';
+                renderBarList('bash-list', bashData.map(b => ({ name: b.cmd, value: b.count })), 6, 'cyan');
+            } else {
+                bashSection.style.display = 'none';
+            }
+
+            if (hasMCP) {
+                mcpSection.style.display = 'block';
+                renderBarList('mcp-list', mcpData.map(m => ({ name: m.mcp_server, value: m.calls })), 6, 'purple');
+            } else {
+                mcpSection.style.display = 'none';
+            }
+        }
+
+        function renderUserCommandsAndErrors(data) {
+            const userCmds = data.user_commands || [];
+            const exoticCmds = data.exotic_commands || [];
+            const toolErrors = data.tool_errors || [];
+            const row = document.getElementById('user-errors-row');
+            const userSection = document.getElementById('user-commands-section');
+            const exoticSection = document.getElementById('exotic-section');
+            const errorsSection = document.getElementById('errors-section');
+
+            const hasUserCmds = userCmds.length > 0;
+            const hasExotic = exoticCmds.length > 0;
+            const hasErrors = toolErrors.length > 0;
+
+            if (!hasUserCmds && !hasExotic && !hasErrors) {
+                row.style.display = 'none';
+                return;
+            }
+
+            row.style.display = 'grid';
+
+            if (hasUserCmds) {
+                userSection.style.display = 'block';
+                renderBarList('user-commands-list', userCmds.map(c => ({ name: c.command, value: c.count })), 8, 'blue');
+            } else {
+                userSection.style.display = 'none';
+            }
+
+            if (hasExotic) {
+                exoticSection.style.display = 'block';
+                renderBarList('exotic-list', exoticCmds.map(c => ({ name: c.cmd, value: c.count })), 10, 'purple');
+            } else {
+                exoticSection.style.display = 'none';
+            }
+
+            if (hasErrors) {
+                errorsSection.style.display = 'block';
+                renderBarList('errors-list', toolErrors.map(e => ({ name: e.error_type, value: e.count })), 8, 'red');
+            } else {
+                errorsSection.style.display = 'none';
+            }
+        }
+
+        function renderGitByProject(data) {
+            const gitProjects = data.git_by_project || [];
+            const section = document.getElementById('git-projects-section');
+            const container = document.getElementById('git-projects-table');
+
+            if (gitProjects.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+
+            // Header row
+            let html = `
+                <div class="git-projects-header">Project</div>
+                <div class="git-projects-header" style="text-align: right;">Commits</div>
+                <div class="git-projects-header" style="text-align: right;">Pushes</div>
+                <div class="git-projects-header" style="text-align: right;">PRs</div>
+                <div class="git-projects-header" style="text-align: right;">Merged</div>
+                <div class="git-projects-header" style="text-align: right;">Total</div>
+            `;
+
+            // Data rows
+            gitProjects.slice(0, 8).forEach(p => {
+                const shortName = getShortProjectName(p.project);
+
+                html += `
+                    <div class="git-projects-cell project-name" title="${p.project}">${shortName}</div>
+                    <div class="git-projects-cell number">${p.commits}</div>
+                    <div class="git-projects-cell number">${p.pushes}</div>
+                    <div class="git-projects-cell number">${p.prs}</div>
+                    <div class="git-projects-cell number">${p.pr_merges || 0}</div>
+                    <div class="git-projects-cell number highlight">${p.total_git}</div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // Tooltip functions
+        function showTooltip(e) {
+            const tooltip = document.getElementById('tooltip');
+            const date = e.target.dataset.date;
+            const count = e.target.dataset.count;
+
+            tooltip.textContent = `${date}: ${count} messages`;
+            tooltip.classList.add('visible');
+
+            const rect = e.target.getBoundingClientRect();
+            tooltip.style.left = rect.left + 'px';
+            tooltip.style.top = (rect.top - 30) + 'px';
+        }
+
+        function hideTooltip() {
+            document.getElementById('tooltip').classList.remove('visible');
+        }
+
+        // Client-side filtering
+        let currentTimeFilter = 'all';
+        let currentProjectFilter = 'all';
+        let chartsInitialized = false;
+        let hourlyChart = null;
+        let tokensChart = null;
+        let modelsChart = null;
+
+        function filterDataByTime(data, days) {
+            if (days === 'all') return data;
+
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - parseInt(days));
+            const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+            // Filter activity_by_day
+            const filteredDaily = (data.activity_by_day || []).filter(d => d.date >= cutoffStr);
+            const filteredHeatmap = (data.heatmap || []).filter(d => d.date >= cutoffStr);
+            const filteredHourly = (data.activity_by_hour || []).filter(d => d.date >= cutoffStr);
+
+            // Recalculate meta from filtered daily data
+            const meta = { ...data.meta };
+            if (filteredDaily.length > 0) {
+                meta.earliest = filteredDaily[0].date;
+                meta.latest = filteredDaily[filteredDaily.length - 1].date;
+                meta.total_sessions = filteredDaily.reduce((s, d) => s + (d.sessions || 0), 0);
+                meta.total_user_messages = filteredDaily.reduce((s, d) => s + (d.user_messages || 0), 0);
+                meta.total_assistant_messages = filteredDaily.reduce((s, d) => s + (d.assistant_messages || 0), 0);
+                meta.total_input_tokens = filteredDaily.reduce((s, d) => s + (d.input_tokens || 0), 0);
+                meta.total_output_tokens = filteredDaily.reduce((s, d) => s + (d.output_tokens || 0), 0);
+                meta.total_cache_read = filteredDaily.reduce((s, d) => s + (d.cache_read || 0), 0);
+                meta.total_cache_write = filteredDaily.reduce((s, d) => s + (d.cache_write || 0), 0);
+            }
+
+            return {
+                ...data,
+                meta,
+                activity_by_day: filteredDaily,
+                heatmap: filteredHeatmap,
+            };
+        }
+
+        function filterDataByProject(data, project, timeFilter) {
+            if (project === 'all') return data;
+
+            // Find the selected project's data from ORIGINAL data (before time filter)
+            const originalProjectData = (STATS_DATA.by_project || []).find(p => p.project === project);
+            if (!originalProjectData) {
+                return {
+                    ...data,
+                    by_project: [],
+                    git_by_project: [],
+                };
+            }
+
+            const filteredGitProjects = (data.git_by_project || []).filter(p => p.project === project);
+
+            // Calculate time filter scaling factor
+            let timeScale = 1;
+            if (timeFilter !== 'all') {
+                const days = parseInt(timeFilter);
+                const cutoff = new Date();
+                cutoff.setDate(cutoff.getDate() - days);
+                const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+                const projectStart = (originalProjectData.first_seen || '').slice(0, 10);
+                const projectEnd = (originalProjectData.last_seen || '').slice(0, 10);
+
+                // Calculate how much of project's time falls within filter
+                const filterStart = cutoffStr > projectStart ? cutoffStr : projectStart;
+                const filterEnd = projectEnd;
+
+                if (filterStart > filterEnd) {
+                    // Project has no activity in filtered time range
+                    timeScale = 0;
+                } else {
+                    const totalDays = Math.max(1, (new Date(projectEnd) - new Date(projectStart)) / (1000 * 60 * 60 * 24));
+                    const filteredDays = Math.max(0, (new Date(filterEnd) - new Date(filterStart)) / (1000 * 60 * 60 * 24));
+                    timeScale = filteredDays / totalDays;
+                }
+            }
+
+            // Scale project data by time filter
+            const scaledProjectData = {
+                ...originalProjectData,
+                sessions: Math.round((originalProjectData.sessions || 0) * timeScale),
+                messages: Math.round((originalProjectData.messages || 0) * timeScale),
+                input_tokens: Math.round((originalProjectData.input_tokens || 0) * timeScale),
+                output_tokens: Math.round((originalProjectData.output_tokens || 0) * timeScale),
+                cache_read: Math.round((originalProjectData.cache_read || 0) * timeScale),
+                cache_write: Math.round((originalProjectData.cache_write || 0) * timeScale),
+                tokens: Math.round((originalProjectData.tokens || 0) * timeScale),
+                cost_usd: Math.round((originalProjectData.cost_usd || 0) * timeScale * 100) / 100,
+            };
+
+            const meta = {
+                ...data.meta,
+                total_sessions: scaledProjectData.sessions,
+                total_user_messages: Math.round(scaledProjectData.messages * 0.5),
+                total_assistant_messages: Math.round(scaledProjectData.messages * 0.5),
+                total_input_tokens: scaledProjectData.input_tokens,
+                total_output_tokens: scaledProjectData.output_tokens,
+                total_cache_read: scaledProjectData.cache_read,
+                total_cache_write: scaledProjectData.cache_write,
+                earliest: timeFilter !== 'all' ? data.meta.earliest : originalProjectData.first_seen,
+                latest: originalProjectData.last_seen,
+            };
+
+            // Filter activity data to project's date range (intersected with time filter)
+            const projectStart = (originalProjectData.first_seen || '').slice(0, 10);
+            const projectEnd = (originalProjectData.last_seen || '').slice(0, 10);
+
+            return {
+                ...data,
+                meta,
+                by_project: [scaledProjectData],
+                git_by_project: filteredGitProjects,
+                activity_by_day: (data.activity_by_day || []).filter(d =>
+                    d.date >= projectStart && d.date <= projectEnd
+                ),
+                heatmap: (data.heatmap || []).filter(d =>
+                    d.date >= projectStart && d.date <= projectEnd
+                ),
+            };
+        }
+
+        function getFilteredData() {
+            let data = STATS_DATA;
+            data = filterDataByTime(data, currentTimeFilter);
+            data = filterDataByProject(data, currentProjectFilter, currentTimeFilter);
+            return data;
+        }
+
+        function populateProjectFilter(data, timeFilter) {
+            const select = document.getElementById('project-filter');
+            const currentValue = select.value;
+
+            // Clear existing options except first
+            while (select.options.length > 1) {
+                select.remove(1);
+            }
+
+            // Filter projects based on time filter
+            let projects = STATS_DATA.by_project || [];
+
+            if (timeFilter && timeFilter !== 'all') {
+                const days = parseInt(timeFilter);
+                const cutoff = new Date();
+                cutoff.setDate(cutoff.getDate() - days);
+                const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+                // Only include projects active within the time filter
+                projects = projects.filter(p => {
+                    const lastSeen = (p.last_seen || '').slice(0, 10);
+                    return lastSeen >= cutoffStr;
+                });
+            }
+
+            // Sort projects alphabetically by short name
+            const sorted = [...projects].sort((a, b) => {
+                const nameA = getShortProjectName(a.project).toLowerCase();
+                const nameB = getShortProjectName(b.project).toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
+
+            sorted.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.project;
+                opt.textContent = getShortProjectName(p.project);
+                select.appendChild(opt);
+            });
+
+            // Restore selection if still valid, otherwise reset to 'all'
+            if ([...select.options].some(o => o.value === currentValue)) {
+                select.value = currentValue;
+            } else {
+                select.value = 'all';
+                currentProjectFilter = 'all';
+            }
+        }
+
+        function setupFilterListeners() {
+            document.getElementById('timeframe-filter').addEventListener('change', (e) => {
+                currentTimeFilter = e.target.value;
+                // Update project dropdown to only show projects active in this time period
+                populateProjectFilter(STATS_DATA, currentTimeFilter);
+                renderAll(getFilteredData());
+            });
+
+            document.getElementById('project-filter').addEventListener('change', (e) => {
+                currentProjectFilter = e.target.value;
+                renderAll(getFilteredData());
+            });
+        }
+
+        function destroyCharts() {
+            if (hourlyChart) { hourlyChart.destroy(); hourlyChart = null; }
+            if (tokensChart) { tokensChart.destroy(); tokensChart = null; }
+            if (modelsChart) { modelsChart.destroy(); modelsChart = null; }
+        }
+
+        function renderAll(data) {
+            destroyCharts();
+            renderBigNumbers(data);
+            renderHeatmap(data);
+            renderHourlyChartFiltered(data);
+            renderTokensChartFiltered(data);
+            renderBarList('tools-list', (data.by_tool || []).filter(t => !t.is_mcp).map(t => ({ name: t.tool_name, value: t.calls })), 6, 'amber');
+            renderProjectsList(data);
+            renderModelsChartFiltered(data);
+            renderListItems('skills-list', data.by_skill || [], 5, true);
+            renderListItems('agents-list', data.by_subagent || [], 5, false);
+            renderFunFacts(data);
+            renderWorkingStyle(data);
+            renderDailyAverages(data);
+            renderContextUsage(data);
+            renderWorkflows(data);
+            renderToolSequences(data);
+            renderWeekdayChart(data);
+            renderErrorAnalysis(data);
+            renderCommandsAndMCP(data);
+            renderGitByProject(data);
+            renderUserCommandsAndErrors(data);
+        }
+
+        function renderHourlyChartFiltered(data) {
+            const hourlyData = data.activity_by_hour || [];
+            const ctx = document.getElementById('hourly-chart').getContext('2d');
+
+            const hours = Array.from({ length: 24 }, (_, i) => {
+                const found = hourlyData.find(h => h.hour === i);
+                return found ? found.messages : 0;
+            });
+
+            hourlyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0')),
+                    datasets: [{
+                        data: hours,
+                        backgroundColor: 'rgba(245, 158, 11, 0.6)',
+                        borderColor: '#F59E0B',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { family: 'JetBrains Mono', size: 10 }, maxRotation: 0, callback: (val, idx) => idx % 4 === 0 ? idx.toString().padStart(2, '0') : '' } },
+                        y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { font: { family: 'JetBrains Mono', size: 10 }, callback: (val) => formatNumber(val) } }
+                    }
+                }
+            });
+        }
+
+        function renderTokensChartFiltered(data) {
+            const dailyData = data.activity_by_day || [];
+            const ctx = document.getElementById('tokens-chart').getContext('2d');
+
+            const labels = dailyData.map(d => d.date);
+            const tokens = dailyData.map(d => (d.input_tokens || 0) + (d.output_tokens || 0));
+
+            tokensChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: tokens,
+                        borderColor: '#F59E0B',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 6, callback: (val, idx) => { const date = new Date(labels[idx]); return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } } },
+                        y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { font: { family: 'JetBrains Mono', size: 10 }, callback: (val) => formatNumber(val) } }
+                    }
+                }
+            });
+        }
+
+        function renderModelsChartFiltered(data) {
+            const modelsData = data.by_model || [];
+            const ctx = document.getElementById('models-chart').getContext('2d');
+            const legendContainer = document.getElementById('models-legend');
+
+            const colors = ['#F59E0B', '#3b82f6', '#10b981', '#8b5cf6', '#ef4444'];
+            const processed = modelsData.slice(0, 5).map((m, i) => {
+                let name = m.model || 'Unknown';
+                if (name.includes('opus')) name = 'Opus';
+                else if (name.includes('sonnet')) name = 'Sonnet';
+                else if (name.includes('haiku')) name = 'Haiku';
+                return { name, messages: m.messages || 0, color: colors[i] };
+            });
+
+            const total = processed.reduce((sum, m) => sum + m.messages, 0);
+
+            modelsChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: processed.map(m => m.name),
+                    datasets: [{
+                        data: processed.map(m => m.messages),
+                        backgroundColor: processed.map(m => m.color),
+                        borderWidth: 0,
+                        cutout: '65%',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            legendContainer.innerHTML = processed.map(m => `
+                <div class="donut-legend-item">
+                    <div class="donut-legend-color" style="background: ${m.color}"></div>
+                    <span class="donut-legend-label">${m.name}</span>
+                    <span class="donut-legend-value">${total > 0 ? ((m.messages / total) * 100).toFixed(0) : 0}%</span>
+                </div>
+            `).join('');
+        }
+
+        // Initialize
+        function init() {
+            const data = STATS_DATA;
+
+            populateProjectFilter(data, 'all');
+            setupFilterListeners();
+            renderAll(data);
+        }
+
+        // Run on load
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
